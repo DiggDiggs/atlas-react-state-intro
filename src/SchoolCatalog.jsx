@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useContext } from "react";
 
 function SchoolCatalog() {
@@ -6,11 +7,13 @@ function SchoolCatalog() {
   const [sortColumn, setSortColumn] = useState("trimester");
   const [sortDirection, setSortDirection] = useState("asc");
 
+
   useEffect(() => {
     fetch("../api/courses.json")
       .then((response) => response.json())
       .then((data) => setCourses(data));
   }, []);
+
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
@@ -55,6 +58,7 @@ function SchoolCatalog() {
     }
     return sortDirection === 'asc' ? comparison : -comparison
 
+
   return (
     <div className="school-catalog">
       <h1>School Catalog</h1>
@@ -65,6 +69,7 @@ function SchoolCatalog() {
         onChange={handleSearch}
       />
       <table>
+
         <thead>
         <tr>
           <th
@@ -123,6 +128,7 @@ function SchoolCatalog() {
                   <button>Enroll</button>
                 </tr>
               ))}
+
             </tr>
           ))}
         </tbody>
