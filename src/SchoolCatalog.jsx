@@ -1,86 +1,105 @@
-import { useEffect, useState } from "react";
-import { useContext } from "react";
-import { CourseInfo } from "./CourseInfo";
+// eslint-disable-next-line no-unused-vars
+import React, { useState, useEffect, useContext } from 'react';
+import { AppContext } from './App';
 
-const SchoolCatalog = () => {
+export default function SchoolCatalog() {
   const [courses, setCourses] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState(null);
-  const [sortDirection, setSortDirection] = useState("asc");
-  const [currentPage, setCurrentPage] = useState(1);
-  const { enrollCourse } = useContext(CourseInfo);
+  const [filter, setFilter] = useState('');
+  const [sort, setSort] = useState('trimester');
+  const [direction, setDirection] = useState('asc');
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 5;
 
+  // Access Enrolled Courses from Context
+  const { enrolledCourses, setEnrolledCourses } = useContext(AppContext);
 
-
+  // Fetch Courses on Component Mount
   useEffect(() => {
-    fetch("/api/courses.json")
-      .then((response) => response.json())
-      .then((data) => setCourses(data));
+    const fetchCourses = async () => {
+      try {
+        const response = await fetch('/api/courses.json');
+        const data = await response.json();
+        setCourses(data);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+      }
+    };
+
+    fetchCourses();
   }, []);
 
-  const handleSort = (column) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
-    } else {
-      setSortColumn(column);
-      setSortDirection("asc");
-    }
+  // Filter Courses Based on Search Input
+  const filteredCourses = courses.filter(({ courseName, courseNumber }) =>
+    courseName.toLowerCase().includes(filter.toLowerCase()) ||
+    courseNumber.toLowerCase().includes(filter.toLowerCase())
+  );
+
+  // Sort Courses Based on Selected Field
+  const handleSort = (field) => {
+    const newDirection = (sort === field && direction === 'asc') ? 'desc' : 'asc';
+    setSort(field);
+    setDirection(newDirection);
   };
 
-  const sortedCourses = [...courses].sort((a, b) => {
-    if (sortColumn) {
-      const aValue = a[sortColumn];
-      const bValue = b[sortColumn];
+  const getSortedCourses = () => {
+    return filteredCourses.slice().sort((a, b) => {
+      const sortOrder = direction === 'asc' ? 1 : -1;
 
-      if (typeof aValue === "number" && typeof bValue === "number") {
-        return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
-      } else {
-        return sortDirection === "asc"
-          ? aValue.localeCompare(bValue)
-          : bValue.localeCompare(aValue);
+      switch (sort) {
+        case 'trimester':
+          return (a.trimester - b.trimester) * sortOrder;
+        case 'course number':
+          return a.courseNumber.localeCompare(b.courseNumber) * sortOrder;
+        case 'course name':
+          return a.courseName.localeCompare(b.courseName) * sortOrder;
+        case 'semester credits':
+          return (a.semesterCredits - b.semesterCredits) * sortOrder;
+        case 'total clock hours':
+          return (a.totalClockHours - b.totalClockHours) * sortOrder;
+        default:
+          return 0;
       }
-    }
-    return 0;
-  });
+    });
+  };
 
-  const filteredCourses = sortedCourses.filter(course =>
-    course.courseNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    course.courseName.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  
-  const itemsPerPage = 5;
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endingIndex = startIndex + itemsPerPage;
-  const paginatedCourses = sortedCourses.slice(startIndex, endingIndex);
+  // Handle Pagination
+  const paginatedCourses = getSortedCourses().slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const hasMore = getSortedCourses().length > page * PAGE_SIZE;
+  const hasLess = page > 1;
+
+  const enrollCourse = (course) => {
+    setEnrolledCourses([...enrolledCourses, course]);
+  };
 
   return (
     <div className="school-catalog">
       <h1>School Catalog</h1>
-      <input 
+      <input
         type="text"
         placeholder="Search"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        value={filter}
+        onChange={(e) => setFilter(e.target.value)}
       />
       <table>
-      <thead>
-        <tr>
-          <th onClick={() => handleSort("trimester")}>Trimester</th>
-          <th onClick={() => handleSort("courseNumber")}>Course Number</th>
-          <th onClick={() => handleSort("courseName")}>Course Name</th>
-          <th onClick={() => handleSort("credits")}>Semester Credits</th>
-          <th onClick={() => handleSort("clockHours")}>Total Clock Hours</th>
-          <th>Enroll</th>
-        </tr>
-      </thead>
+        <thead>
+          <tr>
+            {['trimester', 'course number', 'course name', 'semester credits', 'total clock hours'].map((field) => (
+              <th key={field} onClick={() => handleSort(field)}>
+                {field.charAt(0).toUpperCase() + field.slice(1)}
+                {sort === field && (direction === 'asc' ? ' ▲' : ' ▼')}
+              </th>
+            ))}
+            <th>Enroll</th>
+          </tr>
+        </thead>
         <tbody>
-          {paginatedCourses.map((course, index) => (
-            <tr key={index}>
+          {paginatedCourses.map((course) => (
+            <tr key={course.courseNumber}>
               <td>{course.trimester}</td>
               <td>{course.courseNumber}</td>
               <td>{course.courseName}</td>
-              <td>{course.credits}</td>
-              <td>{course.clockHours}</td>
+              <td>{course.semesterCredits}</td>
+              <td>{course.totalClockHours}</td>
               <td>
                 <button onClick={() => enrollCourse(course)}>Enroll</button>
               </td>
@@ -89,21 +108,9 @@ const SchoolCatalog = () => {
         </tbody>
       </table>
       <div className="pagination">
-        <button 
-          onClick={() => setCurrentPage(currentPage > 1 ? currentPage - 1 : currentPage)}
-          disabled={currentPage === 1}
-        >
-          Previous
-        </button>
-        <button 
-          onClick={() => setCurrentPage(endingIndex < filteredCourses.length ? currentPage + 1 : currentPage)}
-          disabled={endingIndex >= filteredCourses.length}
-        >
-          Next
-        </button>
+        <button disabled={!hasLess} onClick={() => setPage((prev) => prev - 1)}>Previous</button>
+        <button disabled={!hasMore} onClick={() => setPage((prev) => prev + 1)}>Next</button>
       </div>
     </div>
   );
 }
-
-export default SchoolCatalog;
